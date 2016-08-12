@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: Sponsored Content Disclaimer
-Plugin URI: http://www.citymomsblog.com
-Description: Display consistent sponsored content messages to a reader.
-Version: 0.2
+Plugin URI: https://github.com/citymomsblog/sponsored-content-disclaimer
+Description: Add a custom disclaimer message to any blog post. The message can be displayed either above or below the content. Add custom CSS to provide a consistent style across your blog.
+Version: 0.8
 Author: City Moms Blog Network
 Author URI: http://www.citymomsblog.com
 License: GPLv2 or later
@@ -11,11 +11,6 @@ License: GPLv2 or later
 
 // don't load directly
 if (!defined('ABSPATH')) die('-1');
-
-function scd_enqueue_admin_scripts() {
-  wp_enqueue_style( 'scd_admin_styles', plugins_url( 'css/admin.css', __FILE__ ) );
-}
-add_action( 'admin_enqueue_scripts', 'scd_enqueue_admin_scripts' );
 
 /* Fire our meta box setup function on the post editor screen. */
 add_action( 'load-post.php', 'scd_post_meta_boxes_setup' );
@@ -49,22 +44,20 @@ function scd_post_class_meta_box( $object, $box ) {
   wp_nonce_field( basename( __FILE__ ), 'scd-post-class-nonce' );
 
   ?>
-  <textarea name="scd-post-message" id="scd-post-message"><?php echo esc_attr( get_post_meta( $object->ID, 'scd-post-message', true ) ); ?></textarea> <br/>
+  <textarea name="scd-post-message" id="scd-post-message"
+    style="width:100%;"><?php echo esc_attr( get_post_meta( $object->ID, 'scd-post-message', true ) ); ?></textarea> <br/>
 
  <?php
-    $post_meta_display = get_post_meta($post->ID, 'scd-post-display', true);
+    $post_meta_display = get_post_meta($object->ID, 'scd-post-display', true);
   ?>
   <label for="scd-post-class"><?php _e( "Display:", 'example' ); ?></label><br/>
-  <?php echo "Post Display " + $post_meta_display; ?>
-  <input type="radio" name="scd-post-display" value="scd-post-display-above"
-    <?php echo $post_meta_display == 'scd-post-display-above' ? 'checked' : '' ?> />Above Post <br/>
-  <input type="radio" name="scd-post-display" value="scd-post-display-below"
-    <?php echo $post_meta_display == 'scd-post-display-below' ? 'checked' : '' ?> />Below Post <br />
+  <input type="radio" name="scd-post-display" value="above"
+    <?php checked( 'above', $post_meta_display ); ?> />Above Post <br/>
+  <input type="radio" name="scd-post-display" value="below"
+    <?php checked( 'below', $post_meta_display ); ?> />Below Post <br />
 
     <?php
 }
-
-
 
 /* Save the meta box's post metadata. */
 function scd_save_post_class_meta( $post_id, $post ) {
@@ -95,11 +88,9 @@ function scd_save_post_class_meta( $post_id, $post ) {
   }
 
   /* If the new meta value does not match the old value, update it. */
-  elseif ( $new_scd_message && $new_scd_message != $old_scd_message ) {
+  elseif ( $new_scd_message && ($new_scd_message != $old_scd_message || $new_scd_display != $old_scd_display) ) {
     update_post_meta( $post_id, 'scd-post-message', $new_scd_message );
-
-    if ($new_scd_display != $old_scd_display)
-      update_post_meta( $post_id, 'scd-post-display', $new_scd_display );
+    update_post_meta( $post_id, 'scd-post-display', $new_scd_display );
   }
 
   /* If there is no new meta value but an old value exists, delete it. */
@@ -107,4 +98,35 @@ function scd_save_post_class_meta( $post_id, $post ) {
     delete_post_meta( $post_id, 'scd-post-message', $old_scd_message );
     delete_post_meta( $post_id, 'scd-post-display', $old_scd_display );
   }
+}
+
+/* Display the SCD message before or after the content */
+add_filter('the_content', scd_add_message);
+function scd_add_message($content) {
+  global $post;
+
+  $scd_message = get_post_meta( $post->ID, 'scd-post-message', true );
+  $scd_display = get_post_meta( $post->ID, 'scd-post-display', true );
+
+  if ('' != $scd_message) {
+    $wrapped_message = "<div class='scd-message-box'>" . $scd_message . "</div>";
+    if('below' == $scd_display)
+      $content = $content . $wrapped_message;
+    else
+      $content = $wrapped_message . $content;
+  }
+  return $content;
+}
+
+/* Exclude SCD message from the excerpt */
+add_filter( 'get_the_excerpt', 'scd_the_excerpt' );
+function scd_the_excerpt( $output ) {
+  global $post;
+
+  $scd_message = get_post_meta( $post->ID, 'scd-post-message', true );
+
+   if ( has_excerpt() && '' != $scd_message ) {
+     $output = str_replace($scd_message, '', $output);
+   }
+  return $output;
 }
