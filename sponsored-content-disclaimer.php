@@ -3,7 +3,7 @@
 Plugin Name: Sponsored Content Disclaimer
 Plugin URI: https://github.com/citymomsblog/sponsored-content-disclaimer
 Description: Add a custom disclaimer message to any blog post. The message can be displayed either above or below the content. Add custom CSS to provide a consistent style across your blog.
-Version: 0.8
+Version: 1.0
 Author: City Moms Blog Network
 Author URI: http://www.citymomsblog.com
 License: GPLv2 or later
@@ -86,11 +86,14 @@ function scd_save_post_class_meta( $post_id, $post ) {
     add_post_meta( $post_id, 'scd-post-message', $new_scd_message, true );
     add_post_meta( $post_id, 'scd-post-display', $new_scd_display, true );
   }
-
   /* If the new meta value does not match the old value, update it. */
-  elseif ( $new_scd_message && ($new_scd_message != $old_scd_message || $new_scd_display != $old_scd_display) ) {
-    update_post_meta( $post_id, 'scd-post-message', $new_scd_message );
-    update_post_meta( $post_id, 'scd-post-display', $new_scd_display );
+  elseif ( $new_scd_message ) {
+
+    if ($new_scd_message != $old_scd_message)
+      update_post_meta( $post_id, 'scd-post-message', $new_scd_message );
+
+    if ($new_scd_display != $old_scd_display)
+      update_post_meta( $post_id, 'scd-post-display', $new_scd_display );
   }
 
   /* If there is no new meta value but an old value exists, delete it. */
@@ -105,28 +108,17 @@ add_filter('the_content', scd_add_message);
 function scd_add_message($content) {
   global $post;
 
-  $scd_message = get_post_meta( $post->ID, 'scd-post-message', true );
-  $scd_display = get_post_meta( $post->ID, 'scd-post-display', true );
+  if ( is_single() ) {
+    $scd_message = get_post_meta( $post->ID, 'scd-post-message', true );
+    $scd_display = get_post_meta( $post->ID, 'scd-post-display', true );
 
-  if ('' != $scd_message) {
-    $wrapped_message = "<div class='scd-message-box'>" . $scd_message . "</div>";
-    if('below' == $scd_display)
-      $content = $content . $wrapped_message;
-    else
-      $content = $wrapped_message . $content;
+    if ('' != $scd_message) {
+      $wrapped_message = "<div class='scd-message-box'>" . $scd_message . "</div>";
+      if('below' == $scd_display)
+        $content = $content . $wrapped_message;
+      else
+        $content = $wrapped_message . $content;
+    }
   }
   return $content;
-}
-
-/* Exclude SCD message from the excerpt */
-add_filter( 'get_the_excerpt', 'scd_the_excerpt' );
-function scd_the_excerpt( $output ) {
-  global $post;
-
-  $scd_message = get_post_meta( $post->ID, 'scd-post-message', true );
-
-   if ( has_excerpt() && '' != $scd_message ) {
-     $output = str_replace($scd_message, '', $output);
-   }
-  return $output;
 }
